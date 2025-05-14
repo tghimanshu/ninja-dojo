@@ -1,0 +1,11 @@
+google-cloud-aiplatform
+google-cloud-storage
+google-cloud-texttospeech
+pydub
+moviepy
+ffprobe
+streamlit
+streamlit-antd-components
+google-cloud-translate
+py-dotenv
+google-generativeai
