@@ -1,3 +1,14 @@
+"""
+This is the main application file for Vistar - Your Marketing Companion.
+
+It uses Streamlit to provide a user interface for:
+- Generating customer personas based on input details.
+- Creating storyboards from personas and core narratives.
+- Generating scene images for storyboards.
+- Generating videos from text or images using Google's Veo and Imagen models.
+- Managing and displaying the generated content.
+"""
+
 import streamlit as st
 from utils.helper_funcs import generate, generate_image
 from utils.constants import PERSONA_PROMPT, STORYBOARD_PROMPT, SCENE_PROMPT
@@ -169,11 +180,11 @@ def send_request_to_google_api(api_endpoint, data=None):
     Sends an HTTP request to a Google API endpoint.
 
     Args:
-        api_endpoint: The URL of the Google API endpoint.
-        data: (Optional) Dictionary of data to send in the request body (for POST, PUT, etc.).
+        api_endpoint (str): The URL of the Google API endpoint.
+        data (dict, optional): Dictionary of data to send in the request body (for POST, PUT, etc.).
 
     Returns:
-        The response from the Google API.
+        dict: The JSON response from the Google API.
     """
 
     # Get access token calling API
@@ -201,6 +212,21 @@ def compose_videogen_request(
     sample_count,
     enable_prompt_rewriting,
 ):
+    """
+    Composes the request body for video generation.
+
+    Args:
+        prompt (str): The prompt for video generation.
+        image_uri (str): The Google Cloud Storage URI of the input image (optional).
+        gcs_uri (str): The Google Cloud Storage URI for output.
+        seed (int): The seed for random generation.
+        aspect_ratio (str): The aspect ratio of the video (e.g., "16:9").
+        sample_count (int): The number of samples to generate.
+        enable_prompt_rewriting (bool): Whether to enable prompt rewriting.
+
+    Returns:
+        dict: The request body dictionary.
+    """
     instance = {"prompt": prompt}
     if image_uri:
         instance["image"] = {"gcsUri": image_uri, "mimeType": "png"}
@@ -218,6 +244,15 @@ def compose_videogen_request(
 
 
 def fetch_operation(lro_name):
+    """
+    Polls the Google API for the status of a long-running operation.
+
+    Args:
+        lro_name (str): The name of the long-running operation.
+
+    Returns:
+        dict: The response from the API once the operation is done.
+    """
     request = {"operationName": lro_name}
     # The generation usually takes 2 minutes. Loop 30 times, around 5 minutes.
     for i in range(30):
@@ -228,6 +263,20 @@ def fetch_operation(lro_name):
 
 
 def text_to_video(prompt, seed, aspect_ratio, sample_count, output_gcs, enable_pr):
+    """
+    Generates a video from text prompt using Google's video model.
+
+    Args:
+        prompt (str): The prompt for video generation.
+        seed (int): The seed for random generation.
+        aspect_ratio (str): The aspect ratio of the video.
+        sample_count (int): The number of samples to generate.
+        output_gcs (str): The Google Cloud Storage URI for output.
+        enable_pr (bool): Whether to enable prompt rewriting.
+
+    Returns:
+        dict: The response from the API containing the generated video details.
+    """
     req = compose_videogen_request(
         prompt, None, output_gcs, seed, aspect_ratio, sample_count, enable_pr
     )
@@ -239,6 +288,21 @@ def text_to_video(prompt, seed, aspect_ratio, sample_count, output_gcs, enable_p
 def image_to_video(
     prompt, image_gcs, seed, aspect_ratio, sample_count, output_gcs, enable_pr
 ):
+    """
+    Generates a video from an image and text prompt using Google's video model.
+
+    Args:
+        prompt (str): The prompt for video generation.
+        image_gcs (str): The Google Cloud Storage URI of the input image.
+        seed (int): The seed for random generation.
+        aspect_ratio (str): The aspect ratio of the video.
+        sample_count (int): The number of samples to generate.
+        output_gcs (str): The Google Cloud Storage URI for output.
+        enable_pr (bool): Whether to enable prompt rewriting.
+
+    Returns:
+        dict: The response from the API containing the generated video details.
+    """
     req = compose_videogen_request(
         prompt, image_gcs, output_gcs, seed, aspect_ratio, sample_count, enable_pr
     )
@@ -248,6 +312,14 @@ def image_to_video(
 
 
 def show_video(op, input_file, prompt):
+    """
+    Displays or saves the generated video locally.
+
+    Args:
+        op (dict): The operation response containing video details.
+        input_file (str): The input file path (used for naming).
+        prompt (str): The prompt used for generation (used for naming/folder structure).
+    """
     print(op)
     my_path = input_file.split("/")[-1].split(".")[0]
     if not os.path.exists("output/" + my_path + "/" + prompt + "/"):
