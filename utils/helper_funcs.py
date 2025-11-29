@@ -1,8 +1,13 @@
-"""Synthesizes speech from the input string of text or ssml.
-Make sure to be working in a virtual environment.
+"""
+This module provides utility functions for interacting with Google Cloud services
+(Vertex AI, Storage), generating content (text, images, video), and processing media files.
 
-Note: ssml must be well-formed according to:
-    https://www.w3.org/TR/speech-synthesis/
+It includes functions for:
+- Text generation using Vertex AI Gemini models.
+- Image generation using Vertex AI Imagen models.
+- Audio processing and video creation using MoviePy.
+- Google Cloud Storage operations.
+- Text-to-Speech (commented out but framework present).
 """
 
 # from google.cloud import texttospeech_v1, storage, translate_v3
@@ -62,6 +67,15 @@ bucket = storage_client.get_bucket(BUCKET_NAME)
 
 
 def generate(instructions):
+    """
+    Generates text content using the Vertex AI Gemini model based on provided instructions.
+
+    Args:
+        instructions (str): The prompt or instructions for the generative model.
+
+    Returns:
+        str: The generated text content.
+    """
     generation_config = {
         "max_output_tokens": 8192,
         "temperature": 1,
@@ -96,6 +110,18 @@ def generate(instructions):
 
 
 def generate_scene_image(prompt, title, language, audio_file):
+    """
+    Generates scene images using the Vertex AI Imagen model and uploads them to Google Cloud Storage.
+
+    Args:
+        prompt (str): The prompt for generating the image.
+        title (str): The title of the story/project.
+        language (str): The language code.
+        audio_file (str): The name of the associated audio file (used for naming the image).
+
+    Returns:
+        list: A list of file paths (strings) where the generated images are saved locally.
+    """
     images = imagen_model.generate_images(
         prompt=prompt,
         number_of_images=4,
@@ -117,6 +143,17 @@ def generate_scene_image(prompt, title, language, audio_file):
 
 
 def check_scene_images(title, language, audio_file):
+    """
+    Checks if a scene image already exists for a given audio file.
+
+    Args:
+        title (str): The title of the story/project.
+        language (str): The language code.
+        audio_file (str): The name of the associated audio file.
+
+    Returns:
+        str or bool: The path to the image if it exists, otherwise False.
+    """
     if not os.path.exists(
         f"{OUTPUT_FOLDER}{title}/00/{language}/scenes/{audio_file}-00.png"
     ):
@@ -125,6 +162,18 @@ def check_scene_images(title, language, audio_file):
 
 
 def generate_character_images(characters, title, retries=0):
+    """
+    Generates images for a list of characters using the Vertex AI Imagen model.
+
+    Args:
+        characters (list): A list of dictionaries, where each dictionary contains 'name' and 'character_design' keys.
+        title (str): The title of the story/project.
+        retries (int, optional): The current retry count. Defaults to 0.
+
+    Returns:
+        dict: A dictionary where keys are character names and values are lists of image paths.
+              Returns the result of a recursive call if retries occur.
+    """
     all_characters_images = {}
     for character in characters:
         images = imagen_model.generate_images(
@@ -165,6 +214,19 @@ def generate_character_images(characters, title, retries=0):
 
 
 def generate_image(prompt, scene_no, title, retries=0):
+    """
+    Generates images for a specific scene using the Vertex AI Imagen model.
+
+    Args:
+        prompt (str): The prompt for generating the image.
+        scene_no (int or str): The scene number/identifier.
+        title (str): The title of the story/project.
+        retries (int, optional): The current retry count. Defaults to 0.
+
+    Returns:
+        list: A list of local file paths for the generated images.
+              Returns an empty list if generation fails after retries.
+    """
     images = imagen_model.generate_images(
         prompt=prompt,
         number_of_images=4,
@@ -190,6 +252,13 @@ def generate_image(prompt, scene_no, title, retries=0):
 
 
 def get_audiobook_images(story_title, story_details):
+    """
+    Downloads images associated with an audiobook from Google Cloud Storage if they don't exist locally.
+
+    Args:
+        story_title (str): The title of the story.
+        story_details (dict): A dictionary containing story details, including a list of 'images' paths.
+    """
     if not os.path.exists(f"{OUTPUT_FOLDER}{story_title}/images"):
         os.mkdir(f"{OUTPUT_FOLDER}{story_title}/images")
     for img in story_details["images"]:
@@ -198,11 +267,30 @@ def get_audiobook_images(story_title, story_details):
 
 
 def download_chapter(chapter):
+    """
+    Downloads a specific chapter (file) from Google Cloud Storage if it doesn't exist locally.
+
+    Args:
+        chapter (str): The file path of the chapter to download.
+    """
     if not os.path.exists(chapter) and bucket.blob(chapter).exists():
         bucket.blob(chapter).download_to_filename(chapter)
 
 
 def get_audio_paths(story_title, chapter, language, outputType="poster"):
+    """
+    Constructs paths for audio folders and output video files based on story details.
+    Also ensures necessary directories exist.
+
+    Args:
+        story_title (str): The title of the story.
+        chapter (str): The chapter identifier.
+        language (str): The language code.
+        outputType (str, optional): The type of output video ("poster", "scenes", "veo"). Defaults to "poster".
+
+    Returns:
+        tuple: A tuple containing (audio_folder_path, output_video_path).
+    """
     # Replace with the folder containing your audio files
     audio_folder = f"{OUTPUT_FOLDER}{story_title}/{chapter}/{language.lower()}"
     # Replace with the desired output path
@@ -226,6 +314,15 @@ def get_audio_paths(story_title, chapter, language, outputType="poster"):
 
 
 def format_markdown(response_text):
+    """
+    Cleans up markdown formatting from a text string, removing XML/JSON tags and code blocks.
+
+    Args:
+        response_text (str): The text to clean.
+
+    Returns:
+        str: The cleaned text.
+    """
     formatted_text = re.sub(r"xml", "", response_text)
     formatted_text = re.sub(r"json", "", response_text)
     formatted_text = re.sub(r"```", "", formatted_text)
@@ -233,6 +330,16 @@ def format_markdown(response_text):
 
 
 def zoom_in_effect(clip, zoom_ratio=0.04):
+    """
+    Applies a zoom-in effect to a video clip.
+
+    Args:
+        clip (VideoClip): The moviepy video clip to apply the effect to.
+        zoom_ratio (float, optional): The rate of zoom. Defaults to 0.04.
+
+    Returns:
+        VideoClip: The clip with the zoom-in effect applied.
+    """
     def effect(get_frame, t):
         img = Image.fromarray(get_frame(t))
         base_size = img.size
@@ -267,13 +374,18 @@ def merge_audio_with_image(
     image_path, audio_folder, output_path, dialogue_count, gap_ms=20
 ):
     """
-    Merges all audio files in a folder with an image to create a video.
+    Merges audio files with a static image (with zoom effect) to create a video.
+    Uploads the result to Google Cloud Storage.
 
     Args:
-        image_path: Path to the image file (e.g., "storypic.png").
-        audio_folder: Path to the folder containing audio files (e.g., "orig").
-        output_path: Path to save the output video file (e.g., "output.mp4").
-        gap_ms: Duration of the gap between audio clips in milliseconds.
+        image_path (list): List of paths to image files.
+        audio_folder (str): Path to the folder containing audio files.
+        output_path (str): Path to save the output video file.
+        dialogue_count (int): The number of dialogue audio files to look for.
+        gap_ms (int, optional): Duration of the gap between audio clips in milliseconds. Defaults to 20.
+
+    Returns:
+        tuple: A tuple containing (signed_url, output_path).
     """
 
     # try:
@@ -356,6 +468,15 @@ def merge_audio_with_image(
 
 
 def get_folder_path(story_title):
+    """
+    Returns the output folder path for a given story title.
+
+    Args:
+        story_title (str): The title of the story.
+
+    Returns:
+        str: The folder path.
+    """
     return f"{OUTPUT_FOLDER}{story_title}"
 
 
@@ -479,6 +600,15 @@ def get_folder_path(story_title):
 
 
 def is_cached_content(story_title):
+    """
+    Checks if story details are cached locally or in Google Cloud Storage.
+
+    Args:
+        story_title (str): The title of the story.
+
+    Returns:
+        tuple: (bool, dict) - True and the details dictionary if cached, False and empty dict otherwise.
+    """
     details_file_path = f"{OUTPUT_FOLDER}{story_title}/details.json"
 
     if not os.path.exists(f"{OUTPUT_FOLDER}{story_title}"):
@@ -498,6 +628,13 @@ def is_cached_content(story_title):
 
 
 def save_audiobook(story_title, story_details):
+    """
+    Saves the audiobook details to a JSON file and uploads it to Google Cloud Storage.
+
+    Args:
+        story_title (str): The title of the story.
+        story_details (dict): The details of the story to save.
+    """
     details_file_path = f"{OUTPUT_FOLDER}{story_title}/details.json"
     open(details_file_path, "w").write(json.dumps(story_details))
     final_file = bucket.blob(details_file_path)
@@ -505,6 +642,12 @@ def save_audiobook(story_title, story_details):
 
 
 def get_stories():
+    """
+    Retrieves a list of available stories from Google Cloud Storage.
+
+    Returns:
+        list: A list of story titles.
+    """
     stories = bucket.list_blobs(prefix=OUTPUT_FOLDER)
     story_options = []
     for story in stories:
@@ -519,13 +662,19 @@ def merge_audio_with_scene_images(
     title, language, audio_folder, output_path, dialogue_count, gap_ms=20
 ):
     """
-    Merges all audio files in a folder with an image to create a video.
+    Merges audio files with corresponding scene images to create a video.
+    Uploads the result to Google Cloud Storage.
 
     Args:
-        image_path: Path to the image file (e.g., "storypic.png").
-        audio_folder: Path to the folder containing audio files (e.g., "orig").
-        output_path: Path to save the output video file (e.g., "output.mp4").
-        gap_ms: Duration of the gap between audio clips in milliseconds.
+        title (str): The title of the story/project.
+        language (str): The language code.
+        audio_folder (str): Path to the folder containing audio files.
+        output_path (str): Path to save the output video file.
+        dialogue_count (int): The number of dialogue/audio segments.
+        gap_ms (int, optional): Duration of the gap between audio clips in milliseconds. Defaults to 20.
+
+    Returns:
+        tuple: A tuple containing (signed_url, output_path).
     """
 
     # try:
@@ -647,6 +796,13 @@ def merge_audio_with_scene_images(
 
 
 def download_video(gcs_path, local_path):
+    """
+    Downloads a video file from Google Cloud Storage to a local path.
+
+    Args:
+        gcs_path (str): The Google Cloud Storage path (blob name).
+        local_path (str): The local file path where the video should be saved.
+    """
     print(" ----------- ")
     print(gcs_path)
     print(local_path)

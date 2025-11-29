@@ -1,4 +1,16 @@
 """
+This module contains constant definitions and prompt templates used throughout the application.
+
+It includes prompts for:
+- Persona generation
+- Persona image generation
+- Storyboard creation
+- Scene image generation
+
+These constants are used by the generative AI models to guide their output.
+"""
+
+"""
 MAIN PERSONA GENERATION
 """
 
